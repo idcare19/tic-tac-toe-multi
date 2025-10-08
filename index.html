@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tic Tac Toe Multiplayer</title>
+<style>
+    /* Reset */
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; }
+
+    body {
+        background: linear-gradient(135deg, #1f1c2c, #928dab);
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        color: white;
+        text-align: center;
+    }
+
+    h1 { margin-bottom: 20px; font-size: 3rem; text-shadow: 2px 2px 6px rgba(0,0,0,0.4); }
+
+    .inputs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    input {
+        padding: 10px 15px;
+        border-radius: 8px;
+        border: none;
+        outline: none;
+        font-size: 1rem;
+        width: 200px;
+    }
+
+    button {
+        padding: 10px 20px;
+        border-radius: 8px;
+        border: none;
+        background: #ff5f6d;
+        background: linear-gradient(to right, #ffc371, #ff5f6d);
+        color: white;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: 0.3s;
+    }
+
+    button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    #status {
+        margin: 15px 0;
+        font-size: 1.2rem;
+        font-weight: 600;
+        min-height: 1.5em;
+    }
+
+    .board {
+        display: grid;
+        grid-template-columns: repeat(3, 120px);
+        grid-gap: 10px;
+        margin-top: 20px;
+    }
+
+    .cell {
+        width: 120px;
+        height: 120px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 15px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 3rem;
+        cursor: pointer;
+        transition: transform 0.2s, background 0.3s;
+        position: relative;
+    }
+
+    .cell:hover {
+        transform: scale(1.05);
+        background: rgba(255,255,255,0.2);
+    }
+
+    .cell.X { color: #ff5f6d; }
+    .cell.O { color: #24c6dc; }
+
+    #playersList {
+        margin-top: 20px;
+        list-style: none;
+        font-size: 1.1rem;
+    }
+
+    .winner-line {
+        position: absolute;
+        background: yellow;
+        height: 5px;
+        width: 360px;
+        top: 50%;
+        left: -10px;
+        transform-origin: center;
+        animation: drawLine 0.5s ease forwards;
+    }
+
+    @keyframes drawLine {
+        0% { width: 0; }
+        100% { width: 360px; }
+    }
+</style>
+</head>
+<body>
+<h1>Tic Tac Toe</h1>
+
+<div class="inputs">
+    <input type="text" id="playerName" placeholder="Enter your name">
+    <input type="text" id="roomCode" placeholder="Enter room code">
+    <button id="joinBtn">Join Room</button>
+</div>
+
+<h2 id="status">Waiting to join...</h2>
+
+<div class="board" id="board"></div>
+
+<h3>Players:</h3>
+<ul id="playersList"></ul>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let playerSymbol = null;
+let roomCode = null;
+
+const boardElem = document.getElementById("board");
+const statusElem = document.getElementById("status");
+const playersListElem = document.getElementById("playersList");
+const joinBtn = document.getElementById("joinBtn");
+
+// Create board cells
+for (let i = 0; i < 9; i++) {
+    const div = document.createElement("div");
+    div.classList.add("cell");
+    div.dataset.index = i;
+    boardElem.appendChild(div);
+}
+
+joinBtn.addEventListener("click", () => {
+    const playerName = document.getElementById("playerName").value.trim();
+    const room = document.getElementById("roomCode").value.trim();
+    if (!playerName || !room) return alert("Enter name and room code!");
+    roomCode = room;
+    socket.emit("joinRoom", { roomCode: room, playerName });
+});
+
+socket.on("playerData", ({ symbol, roomCode: code }) => {
+    playerSymbol = symbol;
+    statusElem.textContent = `You are ${symbol} in room ${code}. Waiting for opponent...`;
+});
+
+socket.on("full", msg => statusElem.textContent = msg);
+
+socket.on("updatePlayers", players => {
+    playersListElem.innerHTML = players.map(p => `<li>${p.name} (${p.symbol})</li>`).join("");
+});
+
+socket.on("startGame", turn => {
+    statusElem.textContent = turn === playerSymbol ? "Your turn!" : "Opponent's turn";
+});
+
+socket.on("boardUpdate", ({ board, turn, winner }) => {
+    board.forEach((cell, i) => {
+        const div = boardElem.children[i];
+        div.textContent = cell || "";
+        div.classList.remove("X","O");
+        if(cell) div.classList.add(cell);
+    });
+
+    if (winner) {
+        statusElem.textContent = winner === playerSymbol ? "You won!" : "You lost!";
+        // Optional: highlight winning line
+    } else {
+        statusElem.textContent = turn === playerSymbol ? "Your turn" : "Opponent's turn";
+    }
+});
+
+boardElem.addEventListener("click", e => {
+    const index = e.target.dataset.index;
+    if (index !== undefined) socket.emit("move", { roomCode, index: Number(index) });
+});
+</script>
+</body>
+</html>
