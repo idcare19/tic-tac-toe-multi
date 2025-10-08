@@ -1,11 +1,14 @@
 const express = require("express");
+const path = require("path");
 const app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http);
 
-app.use(express.static("public"));
+// Serve static files from 'public' folder
+app.use(express.static(path.join(__dirname, "public")));
 
-const rooms = {}; // store room data
+// Room data
+const rooms = {};
 
 function checkWinner(board) {
     const lines = [
@@ -55,8 +58,11 @@ io.on("connection", socket => {
         const winner = checkWinner(room.board);
         io.to(roomCode).emit("boardUpdate", { board: room.board, turn: room.turn, winner });
 
-        if (!winner) room.turn = room.turn === "X" ? "O" : "X";
-        else room.board = Array(9).fill(null); // reset board after win
+        if (!winner) {
+            room.turn = room.turn === "X" ? "O" : "X";
+        } else {
+            room.board = Array(9).fill(null); // reset board after win
+        }
     });
 
     socket.on("disconnecting", () => {
@@ -72,6 +78,8 @@ io.on("connection", socket => {
     });
 });
 
+// Use dynamic port for Render
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => console.log(Server running on port ${PORT}));
-
+http.listen(PORT, () => {
+    console.log(Server running on port ${PORT});
+});
